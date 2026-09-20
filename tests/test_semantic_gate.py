@@ -58,3 +58,40 @@ class TestSemanticGate:
             # 这些清晰表述应该 passed 或 clarity 为 clear
             # 根据实际调整
             assert result.passed is True or result.clarity == 'clear'
+
+        # ====== 补测 1：非创造性的常理违反（覆盖 72->73, 76->77, 81->86） ======
+    def test_check_common_sense_violation_not_creative(self, semantic_gate):
+        """测试：普通场景下的违反常理"""
+        result = semantic_gate.check("我吃饭不用嘴")
+        
+        assert result.passed is False
+        assert result.clarity == 'ambiguous'
+        assert result.common_sense_violation is True
+        assert result.is_creative is False
+        assert result.needs_user_confirm is True
+        assert any('违反常理' in issue for issue in result.issues)
+        assert any('大众认知不同' in q for q in result.suggested_questions)
+
+    # ====== 补测 2：创造性的常理违反（覆盖 78->79, 92->93） ======
+    def test_check_common_sense_violation_creative(self, semantic_gate):
+        """测试：写小说/脑洞场景下的违反常理（应放行到沙盒）"""
+        # 包含“小说”和“吃饭不用嘴”
+        result = semantic_gate.check("写小说：主角吃饭不用嘴")
+        
+        assert result.passed is True
+        assert result.clarity == 'nonsensical'
+        assert result.common_sense_violation is True
+        assert result.is_creative is True
+        assert result.needs_user_confirm is False
+        assert any('建议进入沙盒推演' in issue for issue in result.issues)
+
+    # ====== 补测 3：创造性但不违反常理 ======
+    def test_check_creative_no_violation(self, semantic_gate):
+        """测试：仅仅是创造性表达，但没有违反常理"""
+        result = semantic_gate.check("这是一个科幻小说")
+        
+        assert result.passed is True
+        assert result.clarity == 'clear'
+        assert result.is_creative is True
+        assert result.common_sense_violation is False
+        assert len(result.issues) == 0

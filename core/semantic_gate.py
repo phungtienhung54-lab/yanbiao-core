@@ -85,19 +85,32 @@ class SemanticGate:
                     f"您是在进行创造性表达（→沙盒推演），还是需要从其他角度理解？"
                 )
 
-        # 判定清晰度
+        # # 判定清晰度
+        # if not issues:
+        #     clarity = "clear"
+        #     passed = True
+        # elif is_creative and cs_violation:
+        #     clarity = "nonsensical"  # 常理违反但在创造性上下文
+        #     passed = True  # 放行到沙盒
+        # elif issues:
+        #     clarity = "ambiguous"
+        #     passed = False  # 需要用户确认
+        # else:
+        #     clarity = "clear"
+        #     passed = True
+
+                # 判定清晰度
+                # 判定清晰度（优化版）
         if not issues:
             clarity = "clear"
             passed = True
         elif is_creative and cs_violation:
-            clarity = "nonsensical"  # 常理违反但在创造性上下文
-            passed = True  # 放行到沙盒
-        elif issues:
-            clarity = "ambiguous"
-            passed = False  # 需要用户确认
-        else:
-            clarity = "clear"
+            clarity = "nonsensical"
             passed = True
+        else:
+            # 由于 issues 不为空，必然需要用户确认
+            clarity = "ambiguous"
+            passed = False
 
         return SemanticCheck(
             passed=passed,
