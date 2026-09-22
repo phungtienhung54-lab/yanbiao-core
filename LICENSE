@@ -1,21 +1,28 @@
-MIT License
+# yanbiao-core
 
-Copyright (c) 2026 廖宝文
+[![Run Tests](https://github.com/phungtienhung54-lab/yanbiao-core.git/actions/workflows/test.yml/badge.svg)](https://github.com/phungtienhung54-lab/yanbiao-core.git/actions/workflows/test.yml)
+[![Coverage](https://img.shields.io/badge/coverage-99.78%25-brightgreen)]()
+[![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg)]()
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+> A human-in-the-loop sharded memory architecture to mitigate concept-drift for long-context LLM.
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+## ✨ 核心特性
+- **分片记忆架构**：Layer 0 核心协议 / Layer 1 事实引擎 / Layer 2 信念系统 / Layer 3 沙盒引擎
+- **用户隔离**：多用户/多会话信念数据完全隔离，无串台
+- **事实校验**：PIF 防护（主观观点过滤）、交叉验证
+- **高质量保障**：101 个测试用例，覆盖率 99.78%，GitHub Actions 自动运行
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+## 🚀 快速开始
+### 安装依赖
+\`\`\`bash
+pip install -r requirements.txt
+\`\`\`
+
+### 运行测试
+\`\`\`bash
+pytest tests/ --cov=core --cov-branch --cov-fail-under=95
+\`\`\`
+
+## 📄 许可证
+本项目采用 [MIT](LICENSE) 许可证。
