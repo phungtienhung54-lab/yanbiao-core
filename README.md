@@ -4,6 +4,7 @@
 [![codecov](https://codecov.io/gh/phungtienhung54-lab/yanbiao-core/branch/main/graph/badge.svg)](https://codecov.io/gh/phungtienhung54-lab/yanbiao-core)
 [![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg)]()
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Release](https://img.shields.io/github/v/release/phungtienhung54-lab/yanbiao-core)](https://github.com/phungtienhung54-lab/yanbiao-core/releases)
 
 > A human-in-the-loop sharded memory architecture to mitigate concept-drift for long-context LLM, based on the Yanbiao Theory.
 
