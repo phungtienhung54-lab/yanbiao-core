@@ -8,6 +8,8 @@
 - Full-chain audit in `YanbiaoCore.process`: every message processing leaves an orchestrator audit record.
 - `get_system_state()` now returns audit statistics.
 - 20 new tests in `tests/test_audit.py`, 2 new tests in `tests/test_integration.py`.
+- Audit integration in `SandboxEngine`: create_sandbox / add_deduction / compress_definition / decompress_definition are now traceable.
+- 6 new tests in `tests/test_audit.py` for sandbox audit coverage.
 
 ### Changed
 - `FactEngine` and `BeliefEngine` constructors accept optional `audit_log` parameter (backward compatible).
@@ -18,6 +20,8 @@
 - `core/fact_engine.py`: 100%
 - `core/belief_engine.py`: 100%
 - Global: 99%
+- `core/sandbox_engine.py`: 100%
+- Test suite: 161 tests
 
 ## [1.1.0] - 2026-09-21
 ### Added
