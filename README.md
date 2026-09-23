@@ -12,7 +12,7 @@
 - **User Isolation**: Beliefs are strictly isolated per user and per session; no cross-talk.
 - **Fact Verification**: PIF guard (subjective opinion filtering) and cross-validation.
 - **Creative Sandbox**: Supports fictional reality deduction with automatic disclaimers and concept-swap protection.
-- **High Quality**: 101 test cases, 99.78% coverage, GitHub Actions CI.
+- **High Quality**: 130+ test cases, 99% coverage, GitHub Actions CI + Codecov.
 
 ## 🚀 Quick Start
 
