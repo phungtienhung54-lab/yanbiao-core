@@ -9,6 +9,7 @@ import pytest
 from core.audit_log import AuditLog, AuditEntry
 from core.fact_engine import FactEngine
 from core.belief_engine import BeliefEngine
+from core.sandbox_engine import SandboxEngine
 
 
 class TestAuditLog:
@@ -274,3 +275,68 @@ class TestBeliefEngineAudit:
         result = engine.adjust_weight("NOT_EXIST", 0.9)
         assert result is None
         assert len(audit.get_history()) == 0
+
+
+
+class TestSandboxEngineAudit:
+    """沙盒引擎 + 审计集成"""
+
+    @pytest.fixture
+    def setup(self, tmp_path):
+        audit = AuditLog(str(tmp_path))
+        engine = SandboxEngine(str(tmp_path), audit_log=audit)
+        return engine, audit
+
+    def test_create_sandbox_audited(self, setup):
+        engine, audit = setup
+        sess = engine.create_sandbox("u1", "假设明天会下雨")
+        history = audit.get_history(module="sandbox", action="create_sandbox")
+        assert len(history) == 1
+        assert history[0].target_id == sess.id
+        assert history[0].user_id == "u1"
+        assert "下雨" in history[0].after["scenario"]
+
+    def test_add_deduction_audited(self, setup):
+        engine, audit = setup
+        sess = engine.create_sandbox("u1", "场景A")
+        audit._entries.clear()  # 只观察 add_deduction
+
+        engine.add_deduction(sess.id, "推演结果1")
+        engine.add_deduction(sess.id, "推演结果2")
+
+        history = audit.get_history(action="add_deduction")
+        assert len(history) == 2
+        assert history[0].after["deduction_preview"] == "推演结果2"
+
+    def test_add_deduction_invalid_no_audit(self, setup):
+        engine, audit = setup
+        result = engine.add_deduction("INVALID", "推演")
+        assert result == "沙盒会话不存在"
+        assert len(audit.get_history(action="add_deduction")) == 0
+
+    def test_compress_definition_audited(self, setup):
+        engine, audit = setup
+        arch = engine.compress_definition("量子计算", "旧定义", "新定义", "更新")
+        history = audit.get_history(action="compress_definition")
+        assert len(history) == 1
+        assert history[0].target_id == arch.id
+        assert history[0].after["term"] == "量子计算"
+        assert history[0].after["new"] == "新定义"
+        assert "更新" in history[0].reason
+
+    def test_decompress_definition_audited(self, setup):
+        engine, audit = setup
+        engine.compress_definition("量子计算", "旧", "新", "更新")
+        audit._entries.clear()
+
+        arch = engine.decompress_definition("量子计算")
+        assert arch is not None
+        history = audit.get_history(action="decompress_definition")
+        assert len(history) == 1
+        assert history[0].target_id == arch.id
+
+    def test_decompress_not_found_no_audit(self, setup):
+        engine, audit = setup
+        result = engine.decompress_definition("不存在")
+        assert result is None
+        assert len(audit.get_history(action="decompress_definition")) == 0

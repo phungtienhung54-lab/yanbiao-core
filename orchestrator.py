@@ -100,7 +100,7 @@ class YanbiaoCore:
         self.semantic_gate = SemanticGate()
         self.fact_engine = FactEngine(storage_path, audit_log=self.audit)
         self.belief_engine = BeliefEngine(storage_path, audit_log=self.audit)
-        self.sandbox = SandboxEngine(storage_path)
+        self.sandbox = SandboxEngine(storage_path, audit_log=self.audit)
         self.conflict_resolver = ConflictResolver(storage_path)
         self.curiosity = CuriosityEngine(storage_path)
 
