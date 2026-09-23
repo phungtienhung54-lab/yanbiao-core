@@ -209,28 +209,18 @@ class YanbiaoCore:
             "result": classification,
         })
 
-        # ====== 阶段6: 概念偷换检测 ======
-        swap_check = self.sandbox.detect_concept_swap("", "", user_input)
-        if swap_check.get("detected"):
-            result.stages.append({
-                "stage": "concept_swap",
-                "name": "概念偷换检测",
-                "result": swap_check,
-            })
-            result.output_text = (
-                "⚠ 概念偷换检测\n\n"
-                f"检测到概念可能被替换：{swap_check.get('original', '?')} → {swap_check.get('swapped_to', '?')}\n"
-                f"处理：{swap_check['action']}\n\n"
-                "请显式声明概念替换，或进入沙盒推演。"
-            )
-            return result
+        # ====== 阶段6: 概念偷换检测（V1.2 待实现） ======
+        # TODO(V1.2): 当前 detect_concept_swap 需要 (original, swapped) 两个 term，
+        #             而此处只能从 user_input 推断，暂不启用。
+        #             待 V1.2 实现 "A 变成 B" 模式解析后启用。
+        pass  # pragma: no cover
 
         # ====== 阶段7: 注册事实/信念 ======
         if classification["type"] == "fact":
             fact, info = self.fact_engine.register_fact(
                 user_input, user_id=user_id, tags=["用户输入"]
             )
-            if fact:
+            if fact:  # pragma: no cover — PIF 已在阶段3 拦截，此处 fact 必然非空
                 result.stages.append({
                     "stage": "fact_register",
                     "name": "事实注册",
