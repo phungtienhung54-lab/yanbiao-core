@@ -1,20 +1,6 @@
 """
 Layer 2: 信念系统 — 用户数据基底 + 会话隔离
 =============================================
-
-"至于其他数据，用我的数据作为基底数据，初始权重高，
- 例如三观方面是作为初始高权重数据，而不是不可撼动的"
-
-"如果是用户已经验证的话，就需要用户确认，并且把未知变量补全，
- 在这个交互窗口里成立，但是不在公开输出数据里，
- 其他用户问同一个问题也不会得出一样的答案"
-
-数据层级（权重从高到低）：
-1. 底层协议（不可撼动）→ Layer 0
-2. 客观事实（universal）→ Layer 1
-3. 用户基底数据（三观等，初始高权重但可调整）→ Layer 2 本模块
-4. 用户会话验证事实（仅当前会话有效）→ Layer 2 session级
-5. 沙盒推演 → Layer 3
 """
 
 from __future__ import annotations
@@ -26,18 +12,19 @@ import time
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional
 
+from .audit_log import AuditLog  # +++
+
 
 @dataclass
 class Belief:
-    """用户信念条目"""
     id: str
     user_id: str
     statement: str
-    weight: float            # 0.0-1.0，初始高权重但不不可撼动
-    category: str            # "worldview"(三观) | "preference"(偏好) | "verified"(验证事实)
-    verified: bool          # 用户是否已确认
-    scope: str              # "session" | "persistent"
-    source: str             # 来源说明
+    weight: float
+    category: str
+    verified: bool
+    scope: str
+    source: str
     created_at: float = field(default_factory=time.time)
     tags: List[str] = field(default_factory=list)
 
@@ -48,15 +35,16 @@ class Belief:
 class BeliefEngine:
     """信念引擎 — 管理用户个人数据，会话隔离。"""
 
-    # 三观相关的高初始权重
     WORLDVIEW_WEIGHT = 0.9
     PREFERENCE_WEIGHT = 0.6
     VERIFIED_WEIGHT = 0.8
 
-    def __init__(self, storage_path: str):
+    def __init__(self, storage_path: str,
+                 audit_log: Optional[AuditLog] = None):  # +++
         self.storage = os.path.join(storage_path, "beliefs")
         os.makedirs(self.storage, exist_ok=True)
         self._beliefs: Dict[str, Belief] = {}
+        self.audit = audit_log  # +++
         self._load_all()
 
     def _load_all(self):
@@ -82,7 +70,6 @@ class BeliefEngine:
                         category: str = "preference",
                         source: str = "用户自述",
                         tags: Optional[List[str]] = None) -> Belief:
-        """注册用户信念。"""
         weight_map = {
             "worldview": self.WORLDVIEW_WEIGHT,
             "preference": self.PREFERENCE_WEIGHT,
@@ -101,33 +88,52 @@ class BeliefEngine:
         )
         self._beliefs[belief.id] = belief
         self._save(belief)
+        if self.audit:  # +++
+            self.audit.record(
+                user_id=user_id,
+                module="belief",
+                action="register",
+                target_id=belief.id,
+                target_type="belief",
+                after=belief.to_dict(),
+                reason=f"用户注册信念 (category={category})",
+            )
         return belief
 
     def get_user_beliefs(self, user_id: str) -> List[Belief]:
-        """获取用户所有信念（会话隔离——只返回属于此用户的）。"""
         return [b for b in self._beliefs.values() if b.user_id == user_id]
 
     def adjust_weight(self, belief_id: str, new_weight: float):
-        """调整信念权重——初始高权重但可调整，不是不可撼动的。"""
         belief = self._beliefs.get(belief_id)
         if belief:
+            before = belief.to_dict() if self.audit else None  # +++
+            old_weight = belief.weight
             belief.weight = max(0.0, min(1.0, new_weight))
             self._save(belief)
+            if self.audit:  # +++
+                self.audit.record(
+                    user_id=belief.user_id,
+                    module="belief",
+                    action="adjust_weight",
+                    target_id=belief.id,
+                    target_type="belief",
+                    before=before,
+                    after=belief.to_dict(),
+                    reason=f"权重从 {old_weight} 调整为 {belief.weight}",
+                )
             return belief
         return None
 
     def query(self, keyword: str, user_id: str) -> List[Belief]:
-        """查询用户信念（严格会话隔离）。"""
         results = []
         for b in self._beliefs.values():
             if b.user_id != user_id:
-                continue  # 其他用户的数据不可见
+                continue
             if keyword in b.statement or any(keyword in t for t in b.tags):
                 results.append(b)
         return results
 
     def check_session_isolation(self, user_id: str, query_user_id: str) -> bool:
-        """检查会话隔离——A用户的验证事实不会影响B用户。"""
         return user_id == query_user_id
 
     def stats(self, user_id: Optional[str] = None) -> Dict:

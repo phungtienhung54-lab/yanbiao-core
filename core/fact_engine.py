@@ -1,16 +1,6 @@
 """
 Layer 1: 事实引擎 — 客观事实公理系统
 =====================================
-
-"事实不是ai摸索出来的，得交叉验证"
-"事实不是主观，事实是绝对客观的"
-"苹果，可食用 → 可入公理；苹果是世界最好吃的水果 → 主观，不入公理"
-
-事实层级：
-- 客观事实（universal）：可验证、可公开、跨用户共享
-  例："苹果可食用"、"水在标准大气压下100°C沸腾"
-- 用户验证事实（session）：仅在此用户会话内成立，不公开
-  例：用户说自己零基础学编程 → 此会话内成立，其他用户问不会得出一样答案
 """
 
 from __future__ import annotations
@@ -23,18 +13,18 @@ from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Tuple
 
 from .pif_guard import PIFGuard
+from .audit_log import AuditLog  # +++
 
 
 @dataclass
 class Fact:
-    """事实条目"""
     id: str
-    statement: str           # 事实陈述
-    category: str            # "objective" | "user_verified"
-    scope: str               # "universal" | "session"
-    verified: bool           # 是否已交叉验证
-    sources: List[str]       # 来源列表（防断章取义）
-    user_id: Optional[str]    # 仅session类型有效
+    statement: str
+    category: str
+    scope: str
+    verified: bool
+    sources: List[str]
+    user_id: Optional[str]
     created_at: float = field(default_factory=time.time)
     tags: List[str] = field(default_factory=list)
 
@@ -58,17 +48,18 @@ class Fact:
 class FactEngine:
     """事实引擎 — 管理客观事实的存储、验证、检索。"""
 
-    def __init__(self, storage_path: str):
+    def __init__(self, storage_path: str,
+                 audit_log: Optional[AuditLog] = None):  # +++
         self.storage = os.path.join(storage_path, "facts")
         os.makedirs(self.storage, exist_ok=True)
         os.makedirs(os.path.join(self.storage, "universal"), exist_ok=True)
         os.makedirs(os.path.join(self.storage, "session"), exist_ok=True)
         self.pif = PIFGuard()
         self._facts: Dict[str, Fact] = {}
+        self.audit = audit_log  # +++
         self._load_all()
 
     def _load_all(self):
-        """加载所有事实"""
         for scope in ["universal", "session"]:
             path = os.path.join(self.storage, scope)
             for fname in os.listdir(path):
@@ -92,12 +83,7 @@ class FactEngine:
     def register_fact(self, statement: str, user_id: Optional[str] = None,
                       sources: Optional[List[str]] = None,
                       tags: Optional[List[str]] = None) -> Tuple[Fact, Dict]:
-        """注册一条事实。
-
-        自动判断是客观事实还是用户验证事实，
-        自动检查PIF，自动分类事实/观点。
-        """
-        # PIF检查
+        # PIF 检查
         pif_alert = self.pif.check(statement, target_individual=user_id)
         if pif_alert.triggered:
             return None, {
@@ -106,42 +92,59 @@ class FactEngine:
                 "alert": pif_alert.__dict__,
             }
 
-        # 事实/观点分类
         classification = self.pif.fact_vs_opinion(statement)
 
         if classification["type"] == "opinion":
-            # 主观观点 → 用户会话级，不公开
             fact = Fact(
                 id=self._gen_id(statement + (user_id or "")),
                 statement=statement,
                 category="user_verified",
                 scope="session",
-                verified=True,  # 用户已确认
+                verified=True,
                 sources=sources or ["用户自述"],
                 user_id=user_id,
                 tags=tags or [],
             )
             self._facts[fact.id] = fact
             self._save(fact)
+            if self.audit:  # +++
+                self.audit.record(
+                    user_id=user_id or "anonymous",
+                    module="fact",
+                    action="register_opinion",
+                    target_id=fact.id,
+                    target_type="fact",
+                    after=fact.to_dict(),
+                    reason="主观观点降级为 session 事实",
+                )
             return fact, {
                 "rejected": False,
                 "classification": classification,
                 "note": "主观观点，仅在用户会话内有效，不公开输出",
             }
 
-        # 客观事实 → 需交叉验证
         fact = Fact(
             id=self._gen_id(statement),
             statement=statement,
             category="objective",
-            scope="universal" if not user_id else "universal",  # 客观事实总是universal
-            verified=False,  # 待交叉验证
+            scope="universal",
+            verified=False,
             sources=sources or [],
-            user_id=None,  # 客观事实不属于任何用户
+            user_id=None,
             tags=tags or [],
         )
         self._facts[fact.id] = fact
         self._save(fact)
+        if self.audit:  # +++
+            self.audit.record(
+                user_id=user_id or "anonymous",
+                module="fact",
+                action="register_objective",
+                target_id=fact.id,
+                target_type="fact",
+                after=fact.to_dict(),
+                reason="客观事实待交叉验证",
+            )
         return fact, {
             "rejected": False,
             "classification": classification,
@@ -150,10 +153,11 @@ class FactEngine:
         }
 
     def cross_validate(self, fact_id: str, source: str) -> Dict:
-        """交叉验证——添加来源，当来源数>=2时标记为已验证。"""
         fact = self._facts.get(fact_id)
         if not fact:
             return {"error": "事实不存在"}
+
+        before = fact.to_dict() if self.audit else None  # +++
 
         if source not in fact.sources:
             fact.sources.append(source)
@@ -162,6 +166,19 @@ class FactEngine:
             fact.verified = True
 
         self._save(fact)
+
+        if self.audit:  # +++
+            self.audit.record(
+                user_id="system",
+                module="fact",
+                action="cross_validate",
+                target_id=fact.id,
+                target_type="fact",
+                before=before,
+                after=fact.to_dict(),
+                reason=f"新增来源: {source}",
+            )
+
         return {
             "fact_id": fact.id,
             "sources": fact.sources,
@@ -170,23 +187,17 @@ class FactEngine:
         }
 
     def query(self, keyword: str, user_id: Optional[str] = None) -> List[Fact]:
-        """查询相关事实。
-
-        - universal事实：所有人可见
-        - session事实：仅对应用户可见
-        """
         results = []
         for fact in self._facts.values():
             if keyword in fact.statement or any(keyword in t for t in fact.tags):
                 if fact.scope == "universal":
-                    if fact.verified:  # 只有已验证的universal事实才返回
+                    if fact.verified:
                         results.append(fact)
                 elif fact.scope == "session" and fact.user_id == user_id:
                     results.append(fact)
         return results
 
     def get_all(self, user_id: Optional[str] = None) -> List[Fact]:
-        """获取所有事实（按scope过滤）"""
         results = []
         for fact in self._facts.values():
             if fact.scope == "universal" and fact.verified:
