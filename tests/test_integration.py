@@ -309,4 +309,23 @@ class TestIntegration:
         # 数量应该相同，且不会重复
         assert count1 == count2
 
+        # ========== 补测：编排层的全链路审计 ==========
+    def test_process_records_audit(self, orchestrator):
+        """每次 process 应在 audit log 里留下一条 orchestrator 记录"""
+        orchestrator.process("苹果是一种水果", user_id="audit_user")
+        history = orchestrator.audit.get_history(
+            user_id="audit_user", module="orchestrator"
+        )
+        assert len(history) == 1
+        assert history[0].action == "process"
+        assert history[0].after["raw_input"] == "苹果是一种水果"
+
+    def test_get_system_state_includes_audit(self, orchestrator):
+        """get_system_state 应包含审计统计"""
+        orchestrator.process("测试输入A", user_id="u1")
+        orchestrator.process("测试输入B", user_id="u1")
+        state = orchestrator.get_system_state()
+        assert "audit" in state
+        assert state["audit"]["total"] > 0
+
     

@@ -36,7 +36,7 @@ from core.semantic_gate import SemanticGate
 from core.sandbox_engine import SandboxEngine, SANDBOX_DISCLAIMER
 from core.conflict_resolver import ConflictResolver
 from core.curiosity_engine import CuriosityEngine, GapPriority
-
+from core.audit_log import AuditLog
 
 @dataclass
 class ProcessingResult:
@@ -91,11 +91,15 @@ class YanbiaoCore:
         os.makedirs(storage_path, exist_ok=True)
 
         # 初始化所有模块
+                # 初始化审计日志（先创建，后续模块共享）
+        self.audit = AuditLog(storage_path)
+
+        # 初始化所有模块（fact/belief 接入审计）
         self.awareness = SelfAwareness()
         self.pif = PIFGuard()
         self.semantic_gate = SemanticGate()
-        self.fact_engine = FactEngine(storage_path)
-        self.belief_engine = BeliefEngine(storage_path)
+        self.fact_engine = FactEngine(storage_path, audit_log=self.audit)
+        self.belief_engine = BeliefEngine(storage_path, audit_log=self.audit)
         self.sandbox = SandboxEngine(storage_path)
         self.conflict_resolver = ConflictResolver(storage_path)
         self.curiosity = CuriosityEngine(storage_path)
@@ -357,9 +361,26 @@ class YanbiaoCore:
             for corr in post_check["corrections"]:
                 result.decision_chain.append(f"自我修正：{corr}")
 
-        # ====== 阶段12: 好奇心报告 ======
+                # ====== 阶段12: 好奇心报告 ======
         result.curiosity_report = self.curiosity.get_curiosity_report()
         result.system_tension = self.curiosity.get_system_tension()
+
+        # ====== 阶段13: 全链路审计 ======
+        self.audit.record(
+            user_id=user_id,
+            module="orchestrator",
+            action="process",
+            target_id=f"msg_{int(result.timestamp)}",
+            target_type="message",
+            after={
+                "raw_input": user_input,
+                "in_sandbox": result.in_sandbox,
+                "needs_user_input": result.needs_user_input,
+                "stages_count": len(result.stages),
+                "unknown_markers": len(result.unknown_markers),
+            },
+            reason="主处理流水线完成",
+        )
 
         return result
 
@@ -480,5 +501,6 @@ class YanbiaoCore:
             "sandbox": self.sandbox.stats(),
             "conflicts": self.conflict_resolver.stats(),
             "curiosity": self.curiosity.stats(),
-            "system_tension": self.curiosity.get_system_tension(),
+                        "system_tension": self.curiosity.get_system_tension(),
+            "audit": self.audit.stats(),  # +++
         }
