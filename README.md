@@ -2,8 +2,10 @@
 A human‑in‑the‑loop sharded memory architecture to mitigate concept‑drift for long‑context LLM, based on the Yanbiao Theory.
 # yanbiao-core
 
+# yanbiao-core
+
 [![Run Tests](https://github.com/phungtienhung54-lab/yanbiao-core/actions/workflows/test.yml/badge.svg)](https://github.com/phungtienhung54-lab/yanbiao-core/actions/workflows/test.yml)
-[![Coverage](https://img.shields.io/badge/coverage-99.78%25-brightgreen)]()
+[![codecov](https://codecov.io/gh/phungtienhung54-lab/yanbiao-core/branch/main/graph/badge.svg)](https://codecov.io/gh/phungtienhung54-lab/yanbiao-core)
 [![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg)]()
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
@@ -17,6 +19,7 @@ A human‑in‑the‑loop sharded memory architecture to mitigate concept‑drif
 - **High Quality**: 101 test cases, 99.78% coverage, GitHub Actions CI.
 
 ## 🚀 Quick Start
+
 ### Install dependencies
 ```bash
 pip install -r requirements.txt
