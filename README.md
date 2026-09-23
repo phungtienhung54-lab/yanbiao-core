@@ -1,8 +1,4 @@
 # yanbiao-core
-A human‑in‑the‑loop sharded memory architecture to mitigate concept‑drift for long‑context LLM, based on the Yanbiao Theory.
-# yanbiao-core
-
-# yanbiao-core
 
 [![Run Tests](https://github.com/phungtienhung54-lab/yanbiao-core/actions/workflows/test.yml/badge.svg)](https://github.com/phungtienhung54-lab/yanbiao-core/actions/workflows/test.yml)
 [![codecov](https://codecov.io/gh/phungtienhung54-lab/yanbiao-core/branch/main/graph/badge.svg)](https://codecov.io/gh/phungtienhung54-lab/yanbiao-core)
@@ -23,21 +19,3 @@ A human‑in‑the‑loop sharded memory architecture to mitigate concept‑drif
 ### Install dependencies
 ```bash
 pip install -r requirements.txt
-
-## 📊 Performance Benchmarks
-
-Measured on Windows 11, Python 3.12.3, JSON file storage.
-
-| Benchmark | Scale | Time |
-|---|---|---|
-| Belief query | 1,000 entries | 0.60 ms |
-| Fact query | 1,000 entries | 0.47 ms |
-| Concurrent belief registration | 100 threads | 49.33 ms |
-| Concurrent sandbox creation | 50 threads | passed |
-| Bulk cross-validation | 500 facts | 627 ms |
-
-> Note: Cross-validation time is dominated by per-fact JSON file writes (~1.25 ms per validation). Batch writes or SQLite storage is planned for V1.2.
-
-## 📄 License
-
-This project is licensed under the [MIT](LICENSE) license.
