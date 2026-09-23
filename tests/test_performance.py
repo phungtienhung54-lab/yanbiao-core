@@ -7,7 +7,7 @@ import pytest
 from core.belief_engine import BeliefEngine
 from core.fact_engine import FactEngine
 from core.sandbox_engine import SandboxEngine
-
+from typing import List, Dict
 
 class TestPerformance:
 
@@ -115,3 +115,66 @@ class TestPerformance:
         verified = [f for f in engine._facts.values() if f.verified]
         assert len(verified) == 500
         print(f"\n[性能] 500 条事实交叉验证耗时: {elapsed*1000:.2f} ms")
+
+class TestSQLitePerformance:
+
+    def test_sqlite_cross_validate_performance(self, tmp_path, monkeypatch):
+        """对比：SQLite 后端的批量交叉验证性能"""
+        from core.fact_engine import FactEngine
+
+        engine = FactEngine(str(tmp_path), use_sqlite=True)
+        # mock PIF
+        class MockAlert:
+            triggered = False
+            def __init__(self):
+                self.__dict__ = {"triggered": False}
+        monkeypatch.setattr(engine.pif, "check", lambda *a, **kw: MockAlert())
+        monkeypatch.setattr(engine.pif, "fact_vs_opinion", lambda s: {"type": "fact"})
+
+        # 注册 500 条
+        facts = []
+        for i in range(500):
+            f, _ = engine.register_fact(f"SQLite事实-{i}")
+            facts.append(f)
+
+        # 交叉验证 1000 次
+        start = time.perf_counter()
+        for f in facts:
+            engine.cross_validate(f.id, "来源A")
+            engine.cross_validate(f.id, "来源B")
+        elapsed = time.perf_counter() - start
+
+        verified = [f for f in engine._facts.values() if f.verified]
+        assert len(verified) == 500
+        print(f"\n[性能对比] SQLite 500 条事实交叉验证: {elapsed*1000:.2f} ms")
+        print(f"[性能对比] JSON 后端: ~627 ms")
+        print(f"[性能对比] 提速: {627 / (elapsed*1000):.1f}x")
+
+    def test_sqlite_batch_cross_validate_performance(self, tmp_path, monkeypatch):
+        """对比：SQLite + 批量 commit 的性能"""
+        from core.fact_engine import FactEngine
+
+        engine = FactEngine(str(tmp_path), use_sqlite=True)
+        class MockAlert:
+            triggered = False
+            def __init__(self):
+                self.__dict__ = {"triggered": False}
+        monkeypatch.setattr(engine.pif, "check", lambda *a, **kw: MockAlert())
+        monkeypatch.setattr(engine.pif, "fact_vs_opinion", lambda s: {"type": "fact"})
+
+        facts = []
+        for i in range(500):
+            f, _ = engine.register_fact(f"批量事实-{i}")
+            facts.append(f)
+
+        fact_ids = [f.id for f in facts]
+        start = time.perf_counter()
+        engine.cross_validate_batch(fact_ids, "来源A")
+        engine.cross_validate_batch(fact_ids, "来源B")
+        elapsed = time.perf_counter() - start
+
+        verified = [f for f in engine._facts.values() if f.verified]
+        assert len(verified) == 500
+        print(f"\n[性能对比] SQLite 单条 commit: 142 ms")
+        print(f"[性能对比] SQLite 批量 commit: {elapsed*1000:.2f} ms")
+        print(f"[性能对比] 相比 JSON 627ms 提速: {627 / (elapsed*1000):.1f}x")
