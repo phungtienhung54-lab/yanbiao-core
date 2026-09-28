@@ -11,7 +11,6 @@ from core.fact_engine import FactEngine
 from core.belief_engine import BeliefEngine
 from core.sandbox_engine import SandboxEngine
 
-
 class TestAuditLog:
 
     @pytest.fixture
@@ -297,11 +296,13 @@ class TestSandboxEngineAudit:
         assert "下雨" in history[0].after["scenario"]
 
     def test_add_deduction_audited(self, setup):
+        import time
         engine, audit = setup
         sess = engine.create_sandbox("u1", "场景A")
         audit._entries.clear()  # 只观察 add_deduction
 
         engine.add_deduction(sess.id, "推演结果1")
+        time.sleep(0.02)  # 加 20ms，确保时间戳不同
         engine.add_deduction(sess.id, "推演结果2")
 
         history = audit.get_history(action="add_deduction")

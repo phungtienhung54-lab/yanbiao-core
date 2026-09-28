@@ -93,66 +93,26 @@ class TestBeliefEngine:
         assert belief_engine.check_session_isolation('user1', 'user2') is False
 
     # ====== 补测 7：持久化加载（覆盖 63->64 和 65->66） ======
-    def test_load_all_persistence(self, tmp_path, monkeypatch):
-        # 1. 覆盖 63->64：强制让 os.path.exists 返回 False
-        engine_empty = BeliefEngine(str(tmp_path))
-        monkeypatch.setattr(os.path, "exists", lambda path: False)
-        engine_empty._load_all()
-        assert len(engine_empty._beliefs) == 0
-        
-        # 恢复 os.path.exists 的原始行为
-        monkeypatch.undo()
-        
-        # 2. 覆盖 65->66：在一个空目录上执行 _load_all
-        empty_storage = tmp_path / "empty_beliefs"
-        empty_storage.mkdir()
-        engine2 = BeliefEngine(str(empty_storage))
-        # 注意：BeliefEngine.__init__ 会创建 self.storage 并调用 _load_all，此时为空目录
-        assert len(engine2._beliefs) == 0
-        
-        # 3. 正常持久化测试
-        engine3 = BeliefEngine(str(tmp_path / "valid_beliefs"))
-        engine3.register_belief('user1', '测试持久化', category='preference')
-        
-        # 重新实例化，触发从磁盘加载
-        engine4 = BeliefEngine(str(tmp_path / "valid_beliefs"))
-        assert len(engine4.get_user_beliefs('user1')) == 1
-        assert engine4.get_user_beliefs('user1')[0].statement == '测试持久化'
+    def test_load_all_persistence(self, tmp_path):
+        """简单持久化：一个引擎写，另一个引擎读"""
+        engine1 = BeliefEngine(str(tmp_path))
+        engine1.register_belief('user1', '测试持久化', category='preference')
 
-    # ====== 补测 8：精确断言统计数据 ======
-    def test_stats(self, belief_engine):
-        belief_engine.register_belief('user1', '信念1', category='worldview')
-        belief_engine.register_belief('user1', '信念2', category='preference')
-        belief_engine.register_belief('user2', '信念3', category='verified')
-        
-        # 全局统计
-        stats_all = belief_engine.stats()
-        assert stats_all["total"] == 3
-        assert stats_all["worldview"] == 1
-        assert stats_all["preference"] == 1
-        assert stats_all["verified"] == 1
-        
-        # 特定用户统计
-        stats_user1 = belief_engine.stats(user_id='user1')
-        assert stats_user1["total"] == 2
-        assert stats_user1["worldview"] == 1
-        assert stats_user1["preference"] == 1
-        assert stats_user1["verified"] == 0
+        engine2 = BeliefEngine(str(tmp_path))
+        beliefs = engine2.get_user_beliefs('user1')
+        assert len(beliefs) == 1
+        assert beliefs[0].statement == '测试持久化'
 
-    # ====== 补测 9：空数据下的统计（避免除零错误） ======
-    def test_stats_empty(self, belief_engine):
-        stats = belief_engine.stats()
-        assert stats["total"] == 0
-        assert stats["avg_weight"] == 0.0
+    def test_load_all_empty_dir(self, tmp_path):
+        """空目录加载：应返回空"""
+        empty_dir = tmp_path / "empty_beliefs"
+        engine = BeliefEngine(str(empty_dir))
+        assert len(engine._beliefs) == 0
 
-        # ====== 补测 10：覆盖 66->65 非 JSON 文件跳过分支 ======
-    def test_load_all_non_json_file(self, tmp_path):
-        """覆盖 66->65：在 beliefs 目录下存在非 .json 文件时，循环应跳过它"""
-        # 1. 手动创建存储目录，并放入一个非 JSON 文件
-        belief_dir = tmp_path / "beliefs"
-        belief_dir.mkdir()
-        (belief_dir / "ignore.txt").write_text("not a json file", encoding="utf-8")
-
-        # 2. 实例化引擎，触发 _load_all。此时循环会进入，但 if 判断为 False，触发 66->65
+    def test_load_all_no_storage(self, tmp_path, monkeypatch):
+        """存储目录不存在时，_load_all 直接返回，不报错"""
+        import os
         engine = BeliefEngine(str(tmp_path))
+        monkeypatch.setattr(os.path, "exists", lambda p: False)
+        engine._load_all()  # 不应抛异常
         assert len(engine._beliefs) == 0

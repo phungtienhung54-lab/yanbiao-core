@@ -167,6 +167,45 @@ class SQLiteBackend:
             "tags": json.loads(row["tags"] or "[]"),
         }
 
+        # ========== Beliefs ==========
+    def save_belief(self, belief: Dict):
+        """保存单条信念（单次 commit）。"""
+        conn = self._get_conn()
+        with self._lock:
+            conn.execute("""
+                INSERT OR REPLACE INTO beliefs
+                (id, user_id, statement, weight, category, verified, scope, source, created_at, tags)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                belief["id"], belief["user_id"], belief["statement"],
+                belief["weight"], belief["category"],
+                1 if belief["verified"] else 0,
+                belief["scope"], belief.get("source", ""),
+                belief.get("created_at", 0),
+                json.dumps(belief.get("tags", []), ensure_ascii=False),
+            ))
+            conn.commit()
+
+    def load_all_beliefs(self) -> List[Dict]:
+        conn = self._get_conn()
+        rows = conn.execute("SELECT * FROM beliefs").fetchall()
+        return [self._row_to_belief(r) for r in rows]
+
+    @staticmethod
+    def _row_to_belief(row) -> Dict:
+        return {
+            "id": row["id"],
+            "user_id": row["user_id"],
+            "statement": row["statement"],
+            "weight": row["weight"],
+            "category": row["category"],
+            "verified": bool(row["verified"]),
+            "scope": row["scope"],
+            "source": row["source"],
+            "created_at": row["created_at"],
+            "tags": json.loads(row["tags"] or "[]"),
+        }
+    
     # ========== 通用 ==========
     def execute(self, sql: str, params: tuple = ()):
         conn = self._get_conn()

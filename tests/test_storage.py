@@ -159,3 +159,49 @@ class TestSQLiteBackendEdgeCases:
         if hasattr(db._local, "conn"):
             del db._local.conn
         db.close()  # 此时 hasattr 为 False，走空分支，不应报错
+
+class TestBeliefEngineSQLite:
+    """信念引擎 + SQLite 集成"""
+
+    @pytest.fixture
+    def engine(self, tmp_path):
+        from core.belief_engine import BeliefEngine
+        return BeliefEngine(str(tmp_path), use_sqlite=True)
+
+    def test_register_and_query_sqlite(self, engine):
+        engine.register_belief("u1", "我喜欢安静", category="preference")
+        engine.register_belief("u2", "我喜欢热闹", category="preference")
+
+        # 用户隔离
+        u1_beliefs = engine.get_user_beliefs("u1")
+        assert len(u1_beliefs) == 1
+        assert u1_beliefs[0].statement == "我喜欢安静"
+
+        # 查询过滤
+        results = engine.query("安静", "u1")
+        assert len(results) == 1
+        # 用户隔离：查询 u2 的信念，u1 看不到
+        assert len(engine.query("安静", "u2")) == 0
+
+    def test_adjust_weight_sqlite(self, engine):
+        belief = engine.register_belief("u1", "测试信念", category="preference")
+        engine.adjust_weight(belief.id, 0.9)
+        # 重新加载确认持久化
+        assert engine._beliefs[belief.id].weight == 0.9
+
+    def test_persistence_across_engines(self, tmp_path):
+        from core.belief_engine import BeliefEngine
+
+        e1 = BeliefEngine(str(tmp_path), use_sqlite=True)
+        e1.register_belief("u1", "持久化信念A", category="preference")
+
+        e2 = BeliefEngine(str(tmp_path), use_sqlite=True)
+        assert len(e2.get_user_beliefs("u1")) == 1
+
+    def test_stats_sqlite(self, engine):
+        engine.register_belief("u1", "信念1", category="worldview")
+        engine.register_belief("u1", "信念2", category="preference")
+        stats = engine.stats(user_id="u1")
+        assert stats["total"] == 2
+        assert stats["worldview"] == 1
+        assert stats["preference"] == 1

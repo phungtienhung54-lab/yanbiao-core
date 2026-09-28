@@ -73,11 +73,12 @@ class FactEngine:
 
     # ========== JSON 后端 ==========
     def _load_all(self):
+        """加载所有事实"""
         for scope in ["universal", "session"]:
             path = os.path.join(self.storage, scope)
             for fname in os.listdir(path):
                 if fname.endswith(".json"):
-                    with open(os.path.join(path, fname)) as f:
+                    with open(os.path.join(path, fname), encoding="utf-8") as f:
                         data = json.load(f)
                         fact = Fact(**{k: v for k, v in data.items()
                                        if k in Fact.__dataclass_fields__})
@@ -87,7 +88,7 @@ class FactEngine:
         scope_dir = os.path.join(self.storage, fact.scope)
         os.makedirs(scope_dir, exist_ok=True)
         path = os.path.join(scope_dir, f"{fact.id}.json")
-        with open(path, "w") as f:
+        with open(path, "w", encoding="utf-8") as f:  # ← 加 encoding="utf-8"
             json.dump(fact.to_dict(), f, ensure_ascii=False, indent=2)
 
     # ========== SQLite 后端 ==========

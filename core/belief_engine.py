@@ -1,6 +1,8 @@
 """
 Layer 2: 信念系统 — 用户数据基底 + 会话隔离
 =============================================
+
+支持双后端：JSON 文件（默认）与 SQLite（use_sqlite=True）。
 """
 
 from __future__ import annotations
@@ -12,7 +14,8 @@ import time
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional
 
-from .audit_log import AuditLog  # +++
+from .audit_log import AuditLog
+from .storage import SQLiteBackend
 
 
 @dataclass
@@ -33,34 +36,54 @@ class Belief:
 
 
 class BeliefEngine:
-    """信念引擎 — 管理用户个人数据，会话隔离。"""
+    """信念引擎 — 支持 JSON 与 SQLite 双后端。"""
 
     WORLDVIEW_WEIGHT = 0.9
     PREFERENCE_WEIGHT = 0.6
     VERIFIED_WEIGHT = 0.8
 
     def __init__(self, storage_path: str,
-                 audit_log: Optional[AuditLog] = None):  # +++
+                 audit_log: Optional[AuditLog] = None,
+                 use_sqlite: bool = False):
         self.storage = os.path.join(storage_path, "beliefs")
-        os.makedirs(self.storage, exist_ok=True)
+        self.use_sqlite = use_sqlite
+        self.audit = audit_log
         self._beliefs: Dict[str, Belief] = {}
-        self.audit = audit_log  # +++
-        self._load_all()
+
+        if use_sqlite:
+            db_path = os.path.join(storage_path, "yanbiao.db")
+            self.db = SQLiteBackend(db_path)
+            self._load_all_sqlite()
+        else:
+            os.makedirs(self.storage, exist_ok=True)
+            self._load_all()
 
     def _load_all(self):
         if not os.path.exists(self.storage):
             return
         for fname in os.listdir(self.storage):
             if fname.endswith(".json"):
-                with open(os.path.join(self.storage, fname)) as f:
+                with open(os.path.join(self.storage, fname), encoding="utf-8") as f:
                     data = json.load(f)
                     belief = Belief(**{k: v for k, v in data.items()
                                        if k in Belief.__dataclass_fields__})
                     self._beliefs[belief.id] = belief
 
+    def _load_all_sqlite(self):
+        for data in self.db.load_all_beliefs():
+            belief = Belief(**{k: v for k, v in data.items()
+                              if k in Belief.__dataclass_fields__})
+            self._beliefs[belief.id] = belief
+
     def _save(self, belief: Belief):
+        if self.use_sqlite:
+            self.db.save_belief(belief.to_dict())
+        else:
+            self._save_json(belief)
+
+    def _save_json(self, belief: Belief):
         path = os.path.join(self.storage, f"{belief.id}.json")
-        with open(path, "w") as f:
+        with open(path, "w", encoding="utf-8") as f:  # 要有 utf-8
             json.dump(belief.to_dict(), f, ensure_ascii=False, indent=2)
 
     def _gen_id(self, user_id: str, statement: str) -> str:
@@ -88,7 +111,7 @@ class BeliefEngine:
         )
         self._beliefs[belief.id] = belief
         self._save(belief)
-        if self.audit:  # +++
+        if self.audit:
             self.audit.record(
                 user_id=user_id,
                 module="belief",
@@ -106,11 +129,11 @@ class BeliefEngine:
     def adjust_weight(self, belief_id: str, new_weight: float):
         belief = self._beliefs.get(belief_id)
         if belief:
-            before = belief.to_dict() if self.audit else None  # +++
+            before = belief.to_dict() if self.audit else None
             old_weight = belief.weight
             belief.weight = max(0.0, min(1.0, new_weight))
             self._save(belief)
-            if self.audit:  # +++
+            if self.audit:
                 self.audit.record(
                     user_id=belief.user_id,
                     module="belief",
